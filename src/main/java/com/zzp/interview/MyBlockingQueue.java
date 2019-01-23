@@ -1,51 +1,57 @@
 package com.zzp.interview;
 
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * 这是新华三的网上面试题：用lock和condition实现一个堵塞队列，具体我也不太理解，只是手写了一遍。
+ * 通过将两个条件谓词分开并放到两个等待线程集中，Condition更容易满足单次通知的需求，条件谓词包含
+ * 的变量必须由Lock来保护，并且在检查条件谓词以及调用await和single时，必须持有Lock对象。
+ * 如果需要高级功能，比如使用公平的队列操作或者在每个锁上对应多个等待线程集，应该优先使用Condition
+ * 而不是内置条件队列.
+ * @param <E>
+ */
 public class MyBlockingQueue<E> {
 
-  private final List<E> list;
-  private final int limit;
-  private final Lock lock = new ReentrantLock();
-  private final Condition notEmpty = lock.newCondition();//非空
-  private final Condition notFull = lock.newCondition();//没满
+  private int size;
+  Lock lock = new ReentrantLock();
+  Condition notEmpty = lock.newCondition();
+  Condition notFull = lock.newCondition();
+  List<E> queue = new LinkedList<E>();
 
-  public MyBlockingQueue(int limit) {
-    this.limit = limit;
-    this.list = new ArrayList<E>();
+
+  public MyBlockingQueue(int size) {
+    this.size = size;
   }
 
-  public void put(E e) {
+  public void put(E e) throws Exception {
+
+    lock.lock();
     try {
-      lock.lock();
-      while (list.size() >= limit) {
+      while (queue.size() >= size) {
         notFull.await();
       }
-      list.add(e);
-      notEmpty.notifyAll();
-    } catch (Exception e2) {
-      // TODO: handle exception
+      queue.add(e);
+      notEmpty.signal();
     } finally {
       lock.unlock();
     }
+
   }
 
-  public E take() {
+  public E take() throws Exception {
+    lock.lock();
     try {
-      lock.lock();
-      while (list.size() == 0) {
+      while (queue.size() == 0) {
         notEmpty.await();
       }
-      E e = list.remove(0);
-      notFull.notifyAll();
-      return e;
-    } catch (Exception e2) {
-      return null;
+      notFull.signal();
+      return queue.remove(0);
+
     } finally {
       lock.unlock();
     }
